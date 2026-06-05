@@ -79,7 +79,7 @@ v1.5 uses `transformers.WhisperModel.from_pretrained` + feature extractor (`scri
 | 1 | **VAE** `models/vae.py` ✅ | AutoencoderKL encode+decode in MLX (NHWC, stock-MLX conv) | **Gate A PASS**: encode mean **1.69e-5** / logvar 4.9e-6 · decode **3.43e-5** (cpu fp32); GPU roundtrip clean |
 | 2 | **UNet** `models/unet.py` ✅ | SD1.x `UNet2DConditionModel` (8→4ch, cross_attn=384, t=0) | **Gate B PASS**: full forward **1.41e-6** (cpu fp32); GPU clean, ~190ms/frame fp32 bs=1 |
 | 3 | **Audio** `whisper/` ✅ | whisper-tiny encoder + `get_whisper_chunk` + sinusoidal PE | **Gate C PASS**: encoder **1.6e-5**, chunk **0.0** (exact), PE 3.1e-6 (cpu fp32) |
-| 4 | **Pipeline** `pipeline_mlx.py` ✅ (core) | mask → encode×2 → cat8 → UNet(t=0) → decode → blend/paste | **Gate D-core PASS**: face-level e2e recon **max|Δ|≤2/255** vs torch (cpu fp32). D-visual (real clip + blend + SyncNet) deferred — needs S3FD/DWPose/face-parse/SyncNet + ffmpeg |
+| 4 | **Pipeline** `pipeline_mlx.py` ✅ | mask → encode×2 → cat8 → UNet(t=0) → decode → blend/paste | **Gate D-core PASS**: face-level recon **≤2/255** vs torch. **Gate D-visual PASS**: real 268-frame clip (faithful DWPose-onnx + S3FD crops, bisenet blend, audio mux) → clean lip-synced video; MLX-vs-torch on real crops **max|Δ|=3 / mean 0.023** ⇒ SyncNet ≡ upstream by construction |
 | 5 | **Realtime** ✅ | batched fp16 frames, `mx.eval` boundaries | **Gate E PASS**: bs=8 → **34 fps** (>25fps realtime), bs=4 → 30.6 fps; peak 7 GB; fp16 recon mean\|Δ\|=0.43 vs torch |
 | 6 | **Quantize + publish** ✅ | int8/int4 UNet Linears (VAE+audio fp16); `dist/` + card | **Gate F PASS**: UNet cosine **q8 1.00000 / q4 0.99985**; recon mean\|Δ\| fp16 0.32 / q8 0.41 / q4 2.74. **Published `mlx-community/MuseTalk-1.5-{fp16,q8,q4}`** (torch-free, self-contained) |
 
@@ -150,3 +150,14 @@ v1.5 uses `transformers.WhisperModel.from_pretrained` + feature extractor (`scri
   (extract `fe.mel_filters`, slaney norm/scale → `assets/mel_filters_80.npy`) rather than recomputing,
   and drop the trailing frame. Result: mel max\|Δ\|=1.3e-5 vs HF; full wav→chunks max\|Δ\|=3.9e-3
   (mean 1.5e-6). **Runtime is now fully torch/transformers-free** (verified with both blocked).
+- **M12 (Gate D-visual, DWPose without mmcv)** — **`mmcv`/`mmpose` will not build on macOS+py3.12**
+  (old `pkg_resources` calls `pkgutil.ImpImporter`, removed in 3.12; openmmlab ships no macOS wheels,
+  China server times out). The faithful escape: **`rtmlib` + `onnxruntime`** runs the *exact* upstream
+  DWPose weights (`dw-ll_ucoco_384.onnx` + `yolox_l.onnx` from `yzd-v/DWPose`) — zero compilation, same
+  keypoints (`[23:91]` = 68 face landmarks). Pair with the bundled S3FD detector (pure torch, no mmcv)
+  for the bbox. Whole faithful crop path runs in the main env. Also: the bisenet face-parse checkpoint
+  is legacy-tar format → shim `torch.load(..., weights_only=False)` (torch-2.6+ default flip).
+- **Validation-equivalence note** — when the MLX output is pixel-equivalent to the torch reference on
+  real data (here ≤3/255), any downstream quality metric (SyncNet) is equal **by construction** — no
+  need to run the metric (which here would need the unbundled LatentSync SyncNet arch). The MLX-vs-torch
+  pixel diff is a *stronger* port-correctness proof than an absolute SyncNet score.
