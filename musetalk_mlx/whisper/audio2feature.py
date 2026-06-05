@@ -3,8 +3,8 @@
 stacked encoder hidden states (B, seq, 5, 384)  -- get_whisper_chunk -->
 per-frame windows (num_frames, 50, 384)  -- PositionalEncoding -->  UNet cross-attn states.
 
-The mel feature extraction stays on HF's WhisperFeatureExtractor (deterministic CPU
-preprocessing); only the encoder + chunking + PE are MLX. (Torch-free mel = follow-up.)
+Mel extraction is now torch-free MLX (see whisper/log_mel.py) — the whole audio path
+(mel + encoder + chunking + PE) runs without torch/transformers.
 """
 from __future__ import annotations
 

@@ -143,3 +143,10 @@ v1.5 uses `transformers.WhisperModel.from_pretrained` + feature extractor (`scri
   decoded in a batch of 4 vs 2 differs by up to ~20/255 on a single pixel (different Metal kernels /
   accumulation order per batch size), while mean\|Δ\| stays ~0.4. Gate fp16 batched paths on **mean**
   abs error, never a single-pixel max. fp32 is stable; only fp16 shows this.
+- **M11 (follow-up, torch-free mel)** — replaced HF `WhisperFeatureExtractor` with a self-contained
+  MLX log-mel (`whisper/log_mel.py`): STFT n_fft=400/hop=160, **periodic** Hann (`np.hanning(n+1)[:-1]`),
+  center+**reflect** pad n_fft//2, power, **drop the last STFT frame** (3001→3000), mel filterbank,
+  `log10 → max(·, max-8) → (·+4)/4`. Two parity-critical details: ship HF's *exact* mel filterbank
+  (extract `fe.mel_filters`, slaney norm/scale → `assets/mel_filters_80.npy`) rather than recomputing,
+  and drop the trailing frame. Result: mel max\|Δ\|=1.3e-5 vs HF; full wav→chunks max\|Δ\|=3.9e-3
+  (mean 1.5e-6). **Runtime is now fully torch/transformers-free** (verified with both blocked).

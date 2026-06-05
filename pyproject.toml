@@ -34,3 +34,6 @@ parity = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["musetalk_mlx*"]
+
+[tool.setuptools.package-data]
+musetalk_mlx = ["whisper/assets/*.npy"]

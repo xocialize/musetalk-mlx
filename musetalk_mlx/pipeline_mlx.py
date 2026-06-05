@@ -135,6 +135,21 @@ class MuseTalkPipeline:
         stacked = self.whisper_encoder(mel)
         return get_whisper_chunk(stacked, librosa_length, fps=fps)
 
+    def encode_audio_from_wav(self, wav_path, fps=25):
+        """Torch-free audio frontend: wav -> MLX log-mel -> whisper enc -> cross-attn chunks.
+
+        Mirrors AudioProcessor.get_audio_feature + get_whisper_chunk with no torch/transformers.
+        """
+        import librosa
+
+        from .whisper.log_mel import N_SAMPLES, log_mel_spectrogram
+
+        wav, _ = librosa.load(str(wav_path), sr=16000)
+        segs = [wav[i:i + N_SAMPLES] for i in range(0, max(len(wav), 1), N_SAMPLES)]
+        feats = [self.whisper_encoder(log_mel_spectrogram(mx.array(s))) for s in segs]
+        stacked = mx.concatenate(feats, axis=1)               # (1, total_seq, 5, 384)
+        return get_whisper_chunk(stacked, len(wav), fps=fps)
+
     def run_batched(self, latent_stack, chunk_stack, batch_size=8):
         """Process N frames in batches (datagen-style). latent_stack:(N,8,32,32),
         chunk_stack:(N,50,384) -> recon BGR uint8 (N,256,256,3)."""
