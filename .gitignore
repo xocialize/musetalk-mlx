@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.DS_Store
+
+# weights & large artifacts (fetched from HF, not committed)
+weights/
+dist/
+outputs/
+goldens/*.npz
+goldens/*.safetensors
+refs/MuseTalk/models/
+
+# upstream code clone (pinned commit recorded in PREFLIGHT; not ours to commit)
+refs/

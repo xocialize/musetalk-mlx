@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musetalk-mlx"
+version = "0.1.0"
+description = "Apple-MLX port of MuseTalk 1.5 — realtime lip-sync via single-step latent-space inpainting"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Dustin / MVS Collective (xocialize-code)" }]
+dependencies = [
+    "mlx>=0.30.0",
+    "numpy",
+    "huggingface_hub",
+    "opencv-python",
+    "librosa",
+    "soundfile",
+]
+
+# PyTorch is an OPTIONAL dev dependency, used only for parity tests & the
+# golden-oracle capture. End users running the MLX port never need torch.
+[project.optional-dependencies]
+parity = [
+    "torch",
+    "diffusers>=0.27",    # AutoencoderKL / UNet2DConditionModel (arch numerically stable since 0.6;
+                          # the 0.6.0.dev0 pin in musetalk.json won't build on py3.12)
+    "transformers",       # HF WhisperModel (v1.5 audio path)
+    "torchvision",
+    "accelerate",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["musetalk_mlx*"]
